@@ -1,11 +1,13 @@
+#!/usr/bin/env python3
 import csv
-import math
 
 
 # ──────────────────────────────────────────────
 # 1. 讀取資料集
 # ──────────────────────────────────────────────
 def load_data(filepath):
+    """Load data.csv"""
+
     kms, prices = [], []
     with open(filepath, newline='') as f:
         reader = csv.DictReader(f)
@@ -21,13 +23,19 @@ def load_data(filepath):
 #    避免梯度下降因數量級差異而難以收斂
 # ──────────────────────────────────────────────
 def normalize(data):
+    """
+    Normalize to eradicate the scale difference,
+    accelerating the fitting process.
+    """
+
     min_v = min(data)
     max_v = max(data)
     return [(x - min_v) / (max_v - min_v) for x in data], min_v, max_v
 
 
 def denormalize_thetas(t0, t1, km_min, km_max, price_min, price_max):
-    """將在正規化空間訓練的 θ 還原回原始尺度"""
+    """Denormalize θs"""
+
     scale = price_max - price_min
     range_km = km_max - km_min
     theta1 = t1 * scale / range_km
@@ -36,28 +44,113 @@ def denormalize_thetas(t0, t1, km_min, km_max, price_min, price_max):
 
 
 # ──────────────────────────────────────────────
-# 3. 梯度下降 (Gradient Descent)
-#    公式來自 Subject：
-#      tmpθ0 = lr × (1/m) × Σ (estimatePrice(km[i]) - price[i])
-#      tmpθ1 = lr × (1/m) × Σ (estimatePrice(km[i]) - price[i]) × km[i]
-#    重點：必須「同時更新」(Simultaneous Update)
+# 3. 梯度下降與最佳化 (Gradient Descent & Optimization)
 # ──────────────────────────────────────────────
-def train(kms_norm, prices_norm, learning_rate=0.1, iterations=1000):
+def compute_error(kms, prices, t0, t1):
+    """Calculate the cost function J(θ0, θ1) = (1/2m) Σ (f(x) - y)^2"""
+    m = len(kms)
+    return (1 / (2 * m)) * sum(
+        ((t0 + t1 * kms[i]) - prices[i]) ** 2 for i in range(m)
+    )
+
+
+def is_converged(tmp0, tmp1, tol=1e-4):
+    """
+    Calculate the length of the error vector (L2 norm) to check convergence.
+    """
+    error_length = (tmp0 ** 2 + tmp1 ** 2) ** 0.5
+    return error_length <= tol, error_length
+# tol for tolerance
+
+
+def decay_learning_rate(lr):
+    """1.5 -> 1.0 -> 0.5 -> 0.1 -> half"""
+
+    if lr > 1.0:
+        return 1.0
+    elif lr > 0.5:
+        return 0.5
+    elif lr > 0.1:
+        return 0.1
+    else:
+        return lr * 0.5
+
+
+# ──────────────────────────────────────────────
+# 3-1. Backtracking Line Search:
+#    當步幅過大使誤差增加時，下調 learning rate 直到誤差下降。
+# ──────────────────────────────────────────────
+def backtracking_line_search(kms, prices, t0, t1,
+                             grad0, grad1, current_error, lr):
+    """
+    Backtracking line search:
+    Dynamically decrease the learning rate if a step increases error
+    (overshooting), ensuring monotonic cost reduction toward the minimum.
+    """
+
+    while lr > 1e-4:
+        tmp0 = lr * grad0
+        tmp1 = lr * grad1
+        next_error = compute_error(kms, prices, t0 - tmp0, t1 - tmp1)
+
+        # 誤差下降，代表步長安全
+        if next_error <= current_error:
+            return lr, tmp0, tmp1, next_error
+
+        # 誤差上升代表衝過頭，下調 lr 重新嘗試
+        lr = decay_learning_rate(lr)
+
+    return lr, lr * grad0, lr * grad1, next_error
+
+
+# ──────────────────────────────────────────────
+# 3-2. 梯度下降與最佳化 (Gradient Descent & Optimization)
+#     tmpθ0 = learningRate × (1/m) Σ (estimatePrice(km[i]) - price[i])
+#     tmpθ1 = lr × (1/m) Σ (estimatePrice(km[i]) - price[i]) × km[i]
+# Update θ0、θ1 simultaneously until error length ||(tmp0, tmp1)|| <= tolerance
+# or the upper bound `iterations` is reached.
+# ──────────────────────────────────────────────
+def train(kms_norm, prices_norm, lr=1.5, iterations=1000, tol=1e-4):
+    """
+    Train the linear regression model using gradient descent with:
+    - Backtracking line search for adaptive learning rate
+    - Simultaneous parameter updates (θ0, θ1)
+    - Error length early stopping (||(tmp0, tmp1)|| <= tol)
+    """
+
     t0, t1 = 0.0, 0.0
     m = len(kms_norm)
+    current_error = compute_error(kms_norm, prices_norm, t0, t1)
 
-    for _ in range(iterations):
-        # 先計算所有偏差，再同時更新
-        tmp0 = learning_rate * (1 / m) * sum(
-            (t0 + t1 * kms_norm[i]) - prices_norm[i]
-            for i in range(m)
+    for i in range(1, iterations + 1):
+        # 1. 計算誤差純梯度方向 (1/m) Σ (estimatePrice(km[i]) - price[i])
+        grad0 = (1 / m) * sum(
+            (t0 + t1 * kms_norm[j]) - prices_norm[j]
+            for j in range(m)
         )
-        tmp1 = learning_rate * (1 / m) * sum(
-            ((t0 + t1 * kms_norm[i]) - prices_norm[i]) * kms_norm[i]
-            for i in range(m)
+        grad1 = (1 / m) * sum(
+            ((t0 + t1 * kms_norm[j]) - prices_norm[j]) * kms_norm[j]
+            for j in range(m)
         )
+
+        # 2. 回溯線搜索：確認步伐安全並取得當前最佳 lr 與更新量
+        lr, tmp0, tmp1, current_error = backtracking_line_search(
+            kms_norm, prices_norm, t0, t1, grad0, grad1, current_error, lr
+        )
+
+        # 3. 同時更新參數
         t0 -= tmp0
         t1 -= tmp1
+
+        # 4. 收斂判定：誤差長度 <= tol 提前停止
+        converged, error_length = is_converged(tmp0, tmp1, tol)
+        if converged:
+            print(
+                f"Stopped at iteration {i}: "
+                f"Error length ({error_length:.2e}) <= tolerance ({tol}) "
+                f"(learningRate={lr})"
+            )
+            break
 
     return t0, t1
 
@@ -68,8 +161,13 @@ def train(kms_norm, prices_norm, learning_rate=0.1, iterations=1000):
 #    R² = 1.0 → 完美擬合；R² = 0 → 與用平均值預測相同
 # ──────────────────────────────────────────────
 def r_squared(kms, prices, theta0, theta1):
+    """Calculate the R² score"""
+
     mean_price = sum(prices) / len(prices)
-    ss_res = sum((prices[i] - (theta0 + theta1 * kms[i])) ** 2 for i in range(len(prices)))
+    ss_res = sum(
+        (prices[i] - (theta0 + theta1 * kms[i])) ** 2
+        for i in range(len(prices))
+    )
     ss_tot = sum((prices[i] - mean_price) ** 2 for i in range(len(prices)))
     return 1 - ss_res / ss_tot
 
@@ -78,6 +176,8 @@ def r_squared(kms, prices, theta0, theta1):
 # 5. 儲存 θ0, θ1 至 thetas.csv
 # ──────────────────────────────────────────────
 def save_thetas(theta0, theta1, filepath='thetas.csv'):
+    """Save θ0, θ1 to thetas.csv"""
+
     with open(filepath, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['theta0', 'theta1'])
@@ -88,10 +188,12 @@ def save_thetas(theta0, theta1, filepath='thetas.csv'):
 # 6. 主流程
 # ──────────────────────────────────────────────
 def main():
+    """Main function to run the linear regression training."""
+
     kms, prices = load_data('data.csv')
 
     # 正規化
-    kms_norm, km_min, km_max       = normalize(kms)
+    kms_norm, km_min, km_max = normalize(kms)
     prices_norm, price_min, price_max = normalize(prices)
 
     # 梯度下降於正規化空間
@@ -105,13 +207,15 @@ def main():
     # 計算精準度
     r2 = r_squared(kms, prices, theta0, theta1)
 
-    print(f"Training complete!")
-    print(f"  theta0 (intercept) = {theta0:.4f}")
-    print(f"  theta1 (slope)     = {theta1:.8f}")
-    print(f"  R² Score           = {r2:.4f}")
+    print(
+        "Training complete!\n"
+        f"  theta0 (intercept) = {theta0:.4f}\n"
+        f"  theta1 (slope)     = {theta1:.8f}\n"
+        f"  R² Score           = {r2:.4f}"
+    )
 
     save_thetas(theta0, theta1)
-    print(f"\nParameters saved to thetas.csv")
+    print("\nParameters saved to thetas.csv.")
 
     # Bonus：視覺化
     try:
@@ -120,7 +224,8 @@ def main():
         plt.figure(figsize=(9, 6))
 
         # 散佈圖
-        plt.scatter(kms, prices, color='steelblue', label='Data points', zorder=3)
+        plt.scatter(kms, prices, color='steelblue',
+                    label='Data points', zorder=3)
 
         # 回歸線
         x_line = [min(kms), max(kms)]
@@ -130,15 +235,15 @@ def main():
 
         plt.xlabel('Mileage (km)')
         plt.ylabel('Price (€)')
-        plt.title('ft_linear_regression: Car Price vs Mileage')
+        plt.title('Linear Regression: Car Price vs Mileage')
         plt.legend()
         plt.tight_layout()
         plt.savefig('plot.png', dpi=150)
         plt.show()
-        print("Plot saved to plot.png")
+        print("Plot saved to plot.png.")
 
     except ImportError:
-        print("(matplotlib not found — skipping visualization)")
+        print("(Matplotlib not found, skipping visualization)")
 
 
 if __name__ == '__main__':

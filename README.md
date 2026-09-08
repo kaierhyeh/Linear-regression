@@ -50,6 +50,13 @@ Load the saved weights and predict the price of a car based on a user-input mile
 python3 predict.py
 ```
 
+### 3. Precision Evaluation (Bonus)
+Calculate the precision of the trained model (R² Score, MAE, RMSE).
+
+```bash
+python3 precision.py
+```
+
 ## 📊 Evaluation Metrics
 During the training phase, the terminal guarantees full transparency by outputting:
 - $\theta_0$ (Intercept)
@@ -85,7 +92,7 @@ During the training phase, the terminal guarantees full transparency by outputti
 ## ✨ 核心技術特點
 
 - **梯度下降 (Gradient Descent)**：手刻迴圈邏輯，逐步調整模型權重以最小化「均方誤差 (MSE, Mean Squared Error)」。
-- **同時更新定理 (Simultaneous Updates)**：嚴格遵守微積分推導，在一個迴圈節拍中先算出所有的偏微分梯度，再「同時」去更新 $\theta_0$ 與 $\theta_1$，避免收斂軌跡錯誤。
+- **同時更新 (Simultaneous Updates)**：嚴格遵守微積分推導，在一個迴圈節拍中先算出所有的偏微分梯度，再「同時」去更新 $\theta_0$ 與 $\theta_1$，避免收斂軌跡錯誤。
 - **特徵正規化 (Feature Normalization)**：因為 `km` 與 `price` 的數量級相差過大，本專案引進了 Min-Max Scaling 技術，將兩者強制壓縮至 `[0, 1]` 區間內進行訓練，這解決了學習率 (Learning Rate) 難以同時滿足雙邊收斂的世紀難題。
 - **模型準確度評估 ($R^2$ Score)**：自動計算判定係數 (Coefficient of Determination)，以此科學指標驗證模型解釋變異的能力。
 - **資料視覺化 (Bonus)**：使用 `matplotlib` 將散佈圖 (Scatter Plot) 與訓練產生的回歸直線完美疊加，達到資料科學一目了然的操作質感。
@@ -110,6 +117,13 @@ python3 train.py
 
 ```bash
 python3 predict.py
+```
+
+### 3. 精準度評估階段 (Bonus)
+獨立執行精準度評估程式，計算 $R^2$ Score、MAE 與 RMSE。
+
+```bash
+python3 precision.py
 ```
 
 ## 📊 評估與輸出
