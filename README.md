@@ -27,6 +27,7 @@ This project reinforces core concepts behind AI algorithms without relying on he
 - **Feature Normalization**: Utilizes Min-Max Scaling on both `km` and `price` to unify their magnitudes, preventing wildly oscillating gradients and enabling smooth convergence.
 - **Model Evaluation ($R^2$ Score)**: Automatically computes the Coefficient of Determination to measure how well the regression line fits the actual data points.
 - **Data Visualization**: Includes a plotting mechanism to overlay the theoretical regression line onto a scatter plot of the original dataset.
+- `ff` to ensure files comply with Flake8. `ctrl+shift+V` to preview markdown files.
 
 ## 🚀 Installation & Execution
 
@@ -36,14 +37,14 @@ The project operates entirely in Python. (Optional: `matplotlib` is required for
 cd "Linear regression"
 ```
 
-### 1. Training Phase
+### 1. Training
 Train the model by reading `data.csv` and computing the optimal parameters. The resulting weights ($\theta_0$ and $\theta_1$) are naturally saved to `thetas.csv`.
 
 ```bash
 python3 train.py
 ```
 
-### 2. Prediction Phase
+### 2. Prediction
 Load the saved weights and predict the price of a car based on a user-input mileage. (If the model has not been trained yet, the program safely defaults to returning `0`).
 
 ```bash
@@ -96,6 +97,7 @@ During the training phase, the terminal guarantees full transparency by outputti
 - **特徵正規化 (Feature Normalization)**：因為 `km` 與 `price` 的數量級相差過大，本專案引進了 Min-Max Scaling 技術，將兩者強制壓縮至 `[0, 1]` 區間內進行訓練，這解決了學習率 (Learning Rate) 難以同時滿足雙邊收斂的世紀難題。
 - **模型準確度評估 ($R^2$ Score)**：自動計算判定係數 (Coefficient of Determination)，以此科學指標驗證模型解釋變異的能力。
 - **資料視覺化 (Bonus)**：使用 `matplotlib` 將散佈圖 (Scatter Plot) 與訓練產生的回歸直線完美疊加，達到資料科學一目了然的操作質感。
+- 以 `ff` 確認符合 flake8 格式。`ctrl+shift+V` 以預覽 markdown 檔案。
 
 ## 🚀 安裝與執行
 
@@ -105,21 +107,21 @@ During the training phase, the terminal guarantees full transparency by outputti
 cd "Linear regression"
 ```
 
-### 1. 訓練階段 (Training)
+### 1. 訓練 (Training)
 讀取 `data.csv` 並啟動梯度下降迴圈，最終會將算出最完美的線性權重儲存為 `thetas.csv`。
 
 ```bash
 python3 train.py
 ```
 
-### 2. 預測階段 (Prediction)
+### 2. 預測 (Prediction)
 讀取訓練好的存檔參數，根據使用者輸入的里程數，即時吐出預估價格。（若在執行訓練程式前就啟動，系統會依照 Subject 要求防呆回傳 `0`）。
 
 ```bash
 python3 predict.py
 ```
 
-### 3. 精準度評估階段 (Bonus)
+### 3. 精準度評估 (Bonus)
 獨立執行精準度評估程式，計算 $R^2$ Score、MAE 與 RMSE。
 
 ```bash
