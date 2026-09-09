@@ -100,7 +100,9 @@ def backtracking_line_search(kms, prices, t0, t1,
         # 誤差上升代表衝過頭，下調 lr 重新嘗試
         lr = decay_learning_rate(lr)
 
-    return lr, lr * grad0, lr * grad1, next_error
+    # 若回溯至小於 1e-4 仍無法使誤差下降：
+    # 代表線搜索失敗（可能已非常接近極小值，或是此方向步長過於粗糙）。
+    return lr, lr * grad0, lr * grad1, current_error
 
 
 # ──────────────────────────────────────────────
